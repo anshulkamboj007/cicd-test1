@@ -8,3 +8,4 @@ pydantic
 joblib
 pytest
 httpx
+prometheus-client
