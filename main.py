@@ -19,6 +19,13 @@ from pydantic    import BaseModel,RootModel
 import joblib
 import uvicorn
 
+from prometheus_client import Counter, Histogram, generate_latest
+from fastapi import Request
+import time
+
+REQUEST_COUNT = Counter("request_count", "Total number of requests", ["endpoint"])
+REQUEST_LATENCY = Histogram("request_latency_seconds", "Latency of requests", ["endpoint"])
+
 mlflow.set_tracking_uri("sqlite:///mlflow.db")
 mlflow.set_experiment("DecisionTree_Experiment")
 
@@ -60,6 +67,19 @@ def predict(request: PredictRequest):
     prediction = model.predict([request.root])
     return {"prediction": int(prediction[0])}
 
+@app.middleware("http")
+async def add_metrics(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    latency = time.time() - start_time
+    REQUEST_COUNT.labels(endpoint=request.url.path).inc()
+    REQUEST_LATENCY.labels(endpoint=request.url.path).observe(latency)
+    return response
+
+@app.get("/metrics")
+def metrics():
+    return generate_latest()
+    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
