@@ -1,0 +1,56 @@
+name: CD — build & push docker image
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write  # needed if using GitHub Container Registry with OIDC
+
+env:
+  IMAGE_NAME: ${{ github.repository }}  # default repo/image name; override if using DockerHub
+  TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (for multi-arch builds)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        # If using GHCR instead, replace:
+        # registry: ghcr.io
+        # username: ${{ github.actor }}
+        # password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/decision-tree:${{ github.sha }}
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/decision-tree:latest
+          file: ./Dockerfile
+          build-args: |
+            PYTHON_VERSION=3.11
+
+      - name: Verify image
+        run: docker run --rm docker.io/${{ secrets.DOCKERHUB_USERNAME }}/decision-tree:latest python -V || true

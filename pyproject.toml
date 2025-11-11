@@ -1,0 +1,13 @@
+[project]
+name = "week1day3"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.121.1",
+    "httpx>=0.28.1",
+    "mlflow>=3.6.0",
+    "pytest>=9.0.0",
+    "scikit-learn>=1.7.2",
+]
