@@ -4,6 +4,6 @@ uvicorn
 pandas
 numpy
 scikit-learn
-mlflow.sklearn
 pydantic
 joblib
+pytest
