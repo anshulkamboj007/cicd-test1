@@ -2,7 +2,7 @@ name: Automated Retrain
 
 on:
   schedule:
-    - cron: "0 6 * * 4"  # 
+    - cron: "0 6 * * 4"   # Every Thursday at 06:00 UTC
   workflow_dispatch:
 
 jobs:
@@ -16,7 +16,7 @@ jobs:
 
       # 2️⃣ Set up Python
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5   # ✅ latest major version
         with:
           python-version: "3.11"
 
@@ -41,13 +41,14 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: trained-model
+          name: trained-model-${{ github.run_id }}   # ✅ unique per run
           path: |
             model.pkl
             artifacts/model/*
           if-no-files-found: warn
+          retention-days: 30   # ✅ keep artifacts for 30 days
 
-      # (Optional) Notify on completion
+      # 6️⃣ (Optional) Notify on completion
       - name: Notify success
         if: success()
         run: echo "✅ Automated retrain completed successfully!"
