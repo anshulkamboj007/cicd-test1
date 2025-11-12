@@ -13,6 +13,7 @@ import os
 
 import mlflow
 import mlflow.sklearn
+from mlflow.tracking import MlflowClient
 
 from fastapi import FastAPI
 from pydantic    import BaseModel,RootModel
@@ -55,6 +56,27 @@ with mlflow.start_run():
 
     joblib.dump(model,'model.pkl')
     logger.info("Model saved as model.pkl")
+
+mlflow.sklearn.log_model(model, "decision_tree_model", registered_model_name="DecisionTreeClassifier")
+
+client = MlflowClient()
+latest = client.get_latest_versions("DecisionTreeClassifier", stages=["None"])[0]
+
+client.transition_model_version_stage(
+    name="DecisionTreeClassifier",
+    version=latest.version,
+    stage="Staging"
+)
+logger.info(f"Registered DecisionTreeClassifier version {latest.version} as 'Staging'")
+
+client.transition_model_version_stage(
+    name="DecisionTreeClassifier",
+    version="1",
+    stage="Production"
+)
+import mlflow.pyfunc
+
+model = mlflow.pyfunc.load_model(model_uri="models:/DecisionTreeClassifier/Production")
 
 app=FastAPI(title="decision tree classifier api")
 

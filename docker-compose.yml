@@ -3,33 +3,54 @@ version: "3.9"
 services:
   model_api:
     build: .
+    container_name: model_api
     ports:
       - "8000:8000"
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
     depends_on:
       - mlflow
+    networks:
+      - mlops_net
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow
     ports:
       - "5000:5000"
     environment:
-      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow.db
+      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow/mlflow.db
       - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlflow/artifacts
     volumes:
       - ./mlflow:/mlflow
+    networks:
+      - mlops_net
 
   prometheus:
     image: prom/prometheus:latest
+    container_name: prometheus
     ports:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - mlops_net
 
   grafana:
     image: grafana/grafana:latest
+    container_name: grafana
     ports:
       - "3000:3000"
+    volumes:
+      - ./grafana:/var/lib/grafana
     depends_on:
       - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - mlops_net
+
+networks:
+  mlops_net:
+    driver: bridge
