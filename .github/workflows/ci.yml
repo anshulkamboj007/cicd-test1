@@ -15,7 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYTHONUNBUFFERED: 1
-      MLFLOW_TRACKING_URI: file://./mlruns   # avoid needing a remote MLflow server
+      MLFLOW_TRACKING_URI: file://./mlruns   # local MLflow store for tests
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -29,17 +30,21 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest
 
+      # ✅ Generate JUnit XML for upload
       - name: Run pytest
         run: |
-          pytest -q --maxfail=1
+          mkdir -p tests-output
+          pytest -q --maxfail=1 --disable-warnings --junitxml=tests-output/results.xml
 
+      # ✅ Upload the test report artifact
       - name: Save test results (junit)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pytest-report
-          path: ./tests-output || ./ # adjust if you generate junit xml
+          path: tests-output/results.xml
 
   build-image:
     name: Build docker image (check build)
@@ -52,4 +57,4 @@ jobs:
       - name: Build image (local check)
         run: |
           docker build -t dtree:ci-check .
-        # keep image local — real push lives in CD workflow
+        # This ensures the Dockerfile builds correctly without publishing
