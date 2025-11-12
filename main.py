@@ -1,4 +1,4 @@
-# app.py — Cleaned and test-friendly version
+# app.py — revised version (works with json=[5.1, 3.5, 1.4, 0.2])
 
 from logging_config import get_logger
 logger = get_logger(__name__)
@@ -15,9 +15,7 @@ import mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
 
-from fastapi import FastAPI, Request, Response
-from pydantic import BaseModel
-
+from fastapi import FastAPI, Request, Response, Body
 import joblib
 import uvicorn
 
@@ -55,7 +53,6 @@ with mlflow.start_run() as run:
     signature = mlflow.models.infer_signature(X_test, preds)
 
     mlflow.log_metric("accuracy", acc)
-
     mlflow.sklearn.log_model(
         sk_model=model,
         artifact_path="decision_tree_model",
@@ -102,17 +99,14 @@ else:
 # ---------------------
 app = FastAPI(title="Decision Tree Classifier API")
 
-class PredictRequest(BaseModel):
-    features: List[float]
-
 @app.post("/predict")
-async def predict(request: PredictRequest):
-    """Make a prediction for a single input sample"""
+async def predict(features: List[float] = Body(...)):
+    """Make a prediction for a single input sample (accepts raw list)."""
     if mlflow_model is None:
         return {"error": "Model not loaded"}
 
     try:
-        preds = mlflow_model.predict([request.features])
+        preds = mlflow_model.predict([features])
         prediction = int(preds[0])
         return {"prediction": prediction}
     except Exception as e:
