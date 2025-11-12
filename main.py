@@ -131,4 +131,61 @@ if latest_version is not None:
 else:
     # if nothing registered, try local fallback
     try:
-        mlflow_model = jobl_
+        mlflow_model = joblib.load("model.pkl")
+        logger.info("Loaded local fallback model ('model.pkl').")
+    except Exception as err:
+        logger.error(f"Failed to load any model: {err}")
+        mlflow_model = None
+
+# ---------------------
+# FastAPI app
+# ---------------------
+app = FastAPI(title="Decision Tree Classifier API")
+
+class PredictRequest(BaseModel):
+    """Single sample for prediction"""
+    features: List[float]
+
+@app.post("/predict")
+async def predict(request: PredictRequest):
+    """
+    Predict endpoint expects a single sample: { "features": [f1, f2, f3, f4] }
+    """
+    if mlflow_model is None:
+        return {"error": "Model not loaded"}
+
+    # If the loaded model is a pyfunc model, it prefers a 2D array or pandas.DataFrame
+    try:
+        # Try pyfunc predict first (it accepts list-of-lists or DataFrame)
+        preds = mlflow_model.predict([request.features])
+        # preds may be numpy array; convert to int for JSON serialization
+        pred = int(preds[0])
+    except Exception:
+        # fallback: if it's a scikit-learn estimator loaded via joblib
+        try:
+            pred = int(mlflow_model.predict([request.features])[0])
+        except Exception as e:
+            logger.error(f"Prediction failed: {e}")
+            return {"error": "prediction failed", "details": str(e)}
+
+    return {"prediction": pred}
+
+# Middleware to record Prometheus metrics
+@app.middleware("http")
+async def add_metrics(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    latency = time.time() - start_time
+    REQUEST_COUNT.labels(endpoint=request.url.path).inc()
+    REQUEST_LATENCY.labels(endpoint=request.url.path).observe(latency)
+    return response
+
+@app.get("/metrics")
+def metrics():
+    # Return Prometheus-compatible response
+    data = generate_latest()
+    return Response(content=data, media_type=CONTENT_TYPE_LATEST)
+
+# Run the app
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
